@@ -1,0 +1,80 @@
+{
+  "manifestVersion": 2,
+  "id": "tesser",
+  "name": "Tesser",
+  "version": "0.1.0",
+  "execution": "trusted-worker",
+  "description": "The tesser box behind each workspace: whether it is awake, and the localhost link to its dev server. Your code stays in the workspace.",
+  "icon": "assets/icon.png",
+  "author": {
+    "name": "Tesser",
+    "url": "https://tesser.sh"
+  },
+  "repository": "https://github.com/tesser-sh/orca-plugin",
+  "license": "MIT",
+  "homepage": "https://tesser.sh",
+  "engines": {
+    "orca": ">=1.4.256"
+  },
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "boxes",
+        "title": "Tesser",
+        "icon": "cloud",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "commands": [
+      {
+        "id": "tesser.open",
+        "title": "Tesser: Open this workspace's dev server",
+        "when": "workspace"
+      }
+    ],
+    "events": [
+      {
+        "on": "workspace.changed"
+      },
+      {
+        "on": "workspace.removed"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "box",
+        "text": "tesser",
+        "icon": "cloud",
+        "tooltip": "Tesser",
+        "command": "tesser.open"
+      }
+    ],
+    "settings": [
+      {
+        "key": "cli",
+        "title": "tesser CLI",
+        "description": "Path to the tesser CLI. Empty: ~/.tesser/bin/tesser, else tesser on PATH.",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "key": "removeBoxes",
+        "title": "Remove boxes with their workspace",
+        "description": "When a workspace is deleted, remove the boxes only it used.",
+        "type": "boolean",
+        "default": true
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "settings:own"
+    }
+  ]
+}
