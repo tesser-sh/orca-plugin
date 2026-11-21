@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { orphaned, split, type LsBox } from './boxes.ts'
+import { candidates, orphaned, split, type LsBox } from './boxes.ts'
 
 const box = (boxId: string, roots: string[], more: Partial<LsBox> = {}): LsBox => ({
   boxId,
@@ -28,4 +28,13 @@ test('boxes sort into this workspace, other workspaces, and neither', () => {
     elsewhere: [{ id: 'box_b', name: 'workbench', size: 'standard', power: 'waking', url: null, worktree: 'there' }],
   })
   expect(split(boxes, null).here).toEqual([])
+})
+
+test('workspaces that share a name and branch across repos all stay candidates, never the first', () => {
+  const rows = ['tesser', 'docs', 'site'].map((repo) => ({ id: `wt-${repo}`, name: 'main', path: `/code/${repo}`, branch: 'refs/heads/main' }))
+  const all = [...rows, { id: 'wt-fix', name: 'fix-login', path: '/code/fix', branch: 'fix-login' }]
+  expect(candidates(all, { displayName: 'main', branch: 'main' }).map((row) => row.path)).toEqual(['/code/tesser', '/code/docs', '/code/site'])
+  expect(candidates(all, { displayName: 'fix-login', branch: 'refs/heads/fix-login' }).map((row) => row.path)).toEqual(['/code/fix'])
+  expect(candidates(all, { id: 'wt-docs', displayName: 'main', branch: 'main' }).map((row) => row.path)).toEqual(['/code/docs'])
+  expect(candidates(all, { displayName: 'renamed in Orca', branch: 'fix-login' }).map((row) => row.path)).toEqual(['/code/fix'])
 })

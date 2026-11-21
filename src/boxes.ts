@@ -20,6 +20,23 @@ export interface Elsewhere extends Box {
   worktree: string
 }
 
+export interface Workspace {
+  id: string
+  name: string
+  path: string
+  branch: string | null
+}
+
+const short = (ref: string | null): string => (ref ?? '').replace(/^refs\/heads\//, '')
+
+export function candidates<Row extends Workspace>(rows: readonly Row[], focused: { id?: string; displayName: string; branch: string }): Row[] {
+  const exact = rows.filter((row) => row.id === focused.id)
+  if (exact.length > 0) return exact
+  const onBranch = rows.filter((row) => short(row.branch) === short(focused.branch))
+  const named = onBranch.filter((row) => row.name === focused.displayName)
+  return named.length > 0 ? named : onBranch
+}
+
 export function parseBoxes(stdout: string): LsBox[] {
   const rows: unknown = JSON.parse(stdout)
   if (!Array.isArray(rows)) throw new Error('`tesser ls --json` did not print a list')
