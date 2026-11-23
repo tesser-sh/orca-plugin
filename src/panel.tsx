@@ -110,11 +110,6 @@ export default function Panel() {
           <Text>{current.failed}</Text>
         </Callout>
       )}
-      {current.outdated ? (
-        <Callout tone="warning" title="Update tesser to open boxes from here">
-          <Code>tesser update</Code>
-        </Callout>
-      ) : null}
       {current.here.length === 0 ? (
         <EmptyState icon="cloud" title="No box for this workspace">
           <Code>tesser dev</Code>

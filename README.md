@@ -11,6 +11,5 @@ The [tesser](https://tesser.sh) box behind each Orca workspace. Your code stays 
 
 - Orca 1.4.256 or later
 - The tesser CLI, signed in: `curl -fsSL https://tesser.sh/install | sh`, then `tesser login`
-- Open needs a tesser newer than 0.84.0: `tesser update`
 
 Start a box from the workspace's terminal with `tesser dev`, or ask your agent to.

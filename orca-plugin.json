@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "tesser",
   "name": "Tesser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "execution": "trusted-worker",
   "description": "The tesser box behind each workspace: whether it is awake, and the localhost link to its dev server. Your code stays in the workspace.",
   "icon": "assets/icon.png",

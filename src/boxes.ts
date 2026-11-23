@@ -4,7 +4,6 @@ export interface LsBox {
   size: string
   power: string
   waking: boolean
-  url?: string | null
   worktrees?: { root: string; name: string }[]
 }
 
@@ -37,14 +36,37 @@ export function candidates<Row extends Workspace>(rows: readonly Row[], focused:
   return named.length > 0 ? named : onBranch
 }
 
+export const BOX_ID = /^box_[0-9a-f]+$/
+
+export function primaryPorts(stdout: string): Map<string, number> {
+  const ports = new Map<string, number>()
+  let rows: unknown
+  try {
+    rows = JSON.parse(stdout)
+  } catch {
+    return ports
+  }
+  if (!Array.isArray(rows)) return ports
+  for (const row of rows as { service?: unknown; ports?: unknown }[]) {
+    const port: unknown = Array.isArray(row.ports) ? row.ports[0] : undefined
+    if (typeof row.service === 'string' && typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536) ports.set(row.service, port)
+  }
+  return ports
+}
+
+export function link(box: Pick<LsBox, 'boxId' | 'service'>, ports: ReadonlyMap<string, number>): string | null {
+  const port = box.service === null ? undefined : ports.get(box.service)
+  return port === undefined || !BOX_ID.test(box.boxId) ? null : `http://box-${box.boxId.slice(4)}.localhost:${port}`
+}
+
 export function parseBoxes(stdout: string): LsBox[] {
   const rows: unknown = JSON.parse(stdout)
   if (!Array.isArray(rows)) throw new Error('`tesser ls --json` did not print a list')
   return rows as LsBox[]
 }
 
-function row(box: LsBox): Box {
-  return { id: box.boxId, name: box.service ?? 'workbench', size: box.size, power: box.waking ? 'waking' : box.power, url: box.url ?? null }
+function row(box: LsBox, ports: ReadonlyMap<string, number>): Box {
+  return { id: box.boxId, name: box.service ?? 'workbench', size: box.size, power: box.waking ? 'waking' : box.power, url: link(box, ports) }
 }
 
 export function orphaned(boxes: readonly LsBox[], root: string, exists: (root: string) => boolean): string[] {
@@ -56,13 +78,13 @@ export function orphaned(boxes: readonly LsBox[], root: string, exists: (root: s
     .map((box) => box.boxId)
 }
 
-export function split(boxes: readonly LsBox[], root: string | null): { here: Box[]; elsewhere: Elsewhere[] } {
+export function split(boxes: readonly LsBox[], root: string | null, ports: ReadonlyMap<string, number>): { here: Box[]; elsewhere: Elsewhere[] } {
   const here: Box[] = []
   const elsewhere: Elsewhere[] = []
   for (const box of boxes) {
     const trees = box.worktrees ?? []
-    if (root !== null && trees.some((tree) => tree.root === root)) here.push(row(box))
-    else if (trees[0] !== undefined) elsewhere.push({ ...row(box), worktree: trees[0].name })
+    if (root !== null && trees.some((tree) => tree.root === root)) here.push(row(box, ports))
+    else if (trees[0] !== undefined) elsewhere.push({ ...row(box, ports), worktree: trees[0].name })
   }
   return { here, elsewhere }
 }

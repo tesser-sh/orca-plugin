@@ -3,14 +3,13 @@ import { existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import type { OrcaWorkerApi } from 'orca/worker'
-import { candidates, orphaned, parseBoxes, split, type LsBox } from './boxes.ts'
+import { BOX_ID, candidates, link, orphaned, parseBoxes, primaryPorts, split, type LsBox } from './boxes.ts'
 import type { State } from './protocol.ts'
 
 const FRESH_MS = 15_000
 const POLL_MS = 60_000
+const PORTS_MS = 5 * 60_000
 const NO_TELEMETRY = { ...process.env, TESSER_TELEMETRY: '0' }
-const BOX_ID = /^box_[0-9a-f]+$/
-const BOX_URL = /^http:\/\/[a-z0-9-]+\.localhost:\d+$/
 
 interface Ran {
   ok: boolean
@@ -46,11 +45,7 @@ async function deleted(path: string): Promise<boolean> {
 }
 
 function list(stdout: string): LsBox[] {
-  return parseBoxes(stdout).map((box) => ({
-    ...box,
-    url: typeof box.url === 'string' && !BOX_URL.test(box.url) ? null : box.url,
-    worktrees: (box.worktrees ?? []).map((tree) => ({ ...tree, root: canonical(tree.root) })),
-  }))
+  return parseBoxes(stdout).map((box) => ({ ...box, worktrees: (box.worktrees ?? []).map((tree) => ({ ...tree, root: canonical(tree.root) })) }))
 }
 
 function tabOn(stdout: string, url: string): string | undefined {
@@ -93,6 +88,7 @@ export function deactivate(): void {
 export default function activate(orca: OrcaWorkerApi): void {
   let cached: { at: number; boxes: LsBox[] } | null = null
   let located: { key: string; path: string | null } | null = null
+  let ports: { at: number; byService: Map<string, number>; unknown: Set<string> } = { at: 0, byService: new Map(), unknown: new Set() }
   let generation = 0
 
   const cli = async (): Promise<string> => {
@@ -124,14 +120,23 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   const state = async (fresh: boolean, failed: string | null = null): Promise<State> => {
     if (fresh || cached === null || Date.now() - cached.at > FRESH_MS) {
-      const ran = await run(await cli(), ['ls', '--json'], 30_000, NO_TELEMETRY)
+      const bin = await cli()
+      const ran = await run(bin, ['ls', '--json'], 30_000, NO_TELEMETRY)
       if (ran.missing) return { status: 'no-cli' }
       if (!ran.ok) return { status: 'failed', message: ran.said }
-      cached = { at: Date.now(), boxes: list(ran.stdout) }
+      const boxes = list(ran.stdout)
+      cached = { at: Date.now(), boxes }
+      const unknown = (known: ReadonlyMap<string, number>): string[] => boxes.flatMap((box) => (box.service === null || known.has(box.service) ? [] : [box.service]))
+      if (Date.now() - ports.at > PORTS_MS || unknown(ports.byService).some((service) => !ports.unknown.has(service))) {
+        const services = await run(bin, ['service', 'ls', '--all', '--json'], 30_000, NO_TELEMETRY)
+        if (services.ok) {
+          const byService = primaryPorts(services.stdout)
+          ports = { at: Date.now(), byService, unknown: new Set(unknown(byService)) }
+        }
+      }
     }
     const workspace = await focused()
-    const outdated = cached.boxes.length > 0 && cached.boxes.every((box) => box.url === undefined)
-    return { status: 'ok', workspace: workspace?.name ?? null, ...split(cached.boxes, workspace?.root ?? null), outdated, failed }
+    return { status: 'ok', workspace: workspace?.name ?? null, ...split(cached.boxes, workspace?.root ?? null, ports.byService), failed }
   }
 
   const publish = async (next: State): Promise<State> => {
@@ -181,9 +186,10 @@ export default function activate(orca: OrcaWorkerApi): void {
     const listed = await state(true)
     if (listed.status !== 'ok') return listed.status === 'failed' ? listed.message : 'tesser is not installed'
     const box = cached?.boxes.find((row) => row.boxId === boxId)
-    if (box?.url == null) return `${boxId} has no dev server to open`
+    const url = box === undefined ? null : link(box, ports.byService)
+    if (box === undefined || url === null) return `${boxId} has no dev server to open`
     const failed = box.power === 'asleep' ? await tesser(['wake', boxId]) : null
-    if (failed === null) await show(box.url)
+    if (failed === null) await show(url)
     return failed
   }
 

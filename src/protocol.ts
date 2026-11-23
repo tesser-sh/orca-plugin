@@ -1,7 +1,7 @@
 import type { Box, Elsewhere } from './boxes.ts'
 
 export type State =
-  | { status: 'ok'; workspace: string | null; here: Box[]; elsewhere: Elsewhere[]; outdated: boolean; failed: string | null }
+  | { status: 'ok'; workspace: string | null; here: Box[]; elsewhere: Elsewhere[]; failed: string | null }
   | { status: 'no-cli' }
   | { status: 'failed'; message: string }
 
